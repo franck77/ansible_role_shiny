@@ -13,13 +13,13 @@ keytab_directory: "/etc/security/keytabs_user"
 role_shiny_last_version: "1.5.3.770-1"
 
 ### REPO
-server_repo_url: "http://phadlx198.haas.socgen:80/repos"
-server_mirror_repo_url: "http://phadlx199.haas.socgen:80/repos"
+server_repo_url: ""
+server_mirror_repo_url: ""
 
 ### MAIL LIST ALERT
-mail_list_watchdog: "wandrille.a.domin@socgen.com,marianne.bioy-ext@socgen.com,franck.vieira@socgen.com,philippe.trigo-ext@socgen.com,guy.akroman-ext@socgen.com"
+mail_list_watchdog: ""
 
 ### WEB APP Shiny
 shiny_webapp_archive_format: "tar"
-shiny_webapp_path_app_user: "/data/homeDS/nfs/home/{{ shiny_webapp_user }}"
+shiny_webapp_path_app_user: "/home/{{ shiny_webapp_user }}"
 
