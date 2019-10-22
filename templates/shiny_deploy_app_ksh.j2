@@ -1,0 +1,213 @@
+#/bin/ksh
+
+#################
+Usage()
+#################
+{
+
+clear
+cat << !FIN
+
+
+DESCRIPTION
+
+        Deploiement d'un web application (à lancer en tant que root)
+
+OPTIONS
+                -u              Spécifier le matricule de l'utilisateur
+
+                -p              Spécifier le nom du projet
+
+                -t              Spécifier le nom de la pizza team
+
+                -path   Spécifier le chemin jusqu'au
+
+Exemple d'utilisation :
+
+        Déployer l'application "test_data" qui se trouve dans le home de l'utilisateur A444051 (/data/homeDS/nfs/home/A444051) de la pizza team bddf
+                ./deploy_webapp.ksh -p test_data -t bddf -u A444041
+
+        Déployer l'application "test_shiny" qui se trouve dans /home/A444051/
+                ./deploy_webapp.ksh -p test_shiny -t bddf -path /home/A444051/
+
+!FIN
+
+exit 1
+
+}
+
+#################
+LOG()
+#################
+{
+        case $1 in
+                1) level="INFO    " ;;
+                2) level="STATUS  " ;;
+                3) level="WARN    " ;;
+                4) level="ERROR   " ;;
+        esac
+
+        echo "$(date +"%d/%m/%Y %H:%M:%S")  ${ve_shellName} ${level} $2" >> ${vf_log}
+
+}
+
+
+#################
+f_Trap ()
+#################
+{
+
+LOG 1 "Code retour global $1"
+
+mv ${vf_log} ${vf_log%.*} >/dev/null 2>&1
+echo "Pour un compte rendu consulter le log ${vf_log%.*}"
+
+exit $1
+
+}
+
+
+###############################################################
+######################### MAIN ################################
+###############################################################
+trap 'echo "CTRL-C was pressed";f_Trap 1' 2
+trap 'echo "CTRL-D was pressed";f_Trap 1' 2
+trap 'echo "CTRL-Z was pressed";f_Trap 1' 2
+
+
+# test argument
+if [ $# -ne 6 ]
+then
+        Usage
+fi
+
+# The user who run this script is root ?
+if [ $EUID -ne 0 ]; then
+  LOG "4" "The script \"$0\" must be run as root"
+  echo "The script \"$0\" must be run as root"
+  exit -3
+fi
+
+#### Local directory
+APP_HOME="/applis/shiny"
+SCRIPTS_HOME="$APP_HOME/scripts"
+path_log="$SCRIPTS_HOME/log"
+BIN_HOME="$SCRIPTS_HOME/bin"
+CFG_HOME="$SCRIPTS_HOME/cfg"
+
+#### Other directory
+PATH_HOME="/data/homeDS/nfs/home"
+SERVER_HOME="/srv/shiny-server/apps"
+DIR_ARCHIVE_NAME="archive"
+
+### VAR
+typeset whoami=$( who am i | awk '{ print $1 }')
+typeset ve_Date=$(date +"%Y%m%d_%H%M%S")
+typeset ve_shellName=$(basename $0)
+typeset logPatternId
+typeset serverName=$(hostname | tr [A-Z] [a-z])
+
+# Definition des variables restantes (construite a partir du fichier de configuration)
+typeset vf_log="${path_log}/${ve_shellName}.${ve_Date}.${whoami}.log.tmp"
+
+while true ; do
+        case "$1" in
+                -u)
+                        user=$2
+                        dirHomeUser="$PATH_HOME/$2"
+                break ;;
+
+                -p)
+                        project_name=$2
+                shift 2 ;;
+
+                -t)
+                        entity_name=$2
+                        dirServer="$SERVER_HOME/$entity_name"
+                        dirArchiveServer="$dirServer/$DIR_ARCHIVE_NAME"
+                shift 2 ;;
+
+                -path)
+                        dirHomeUser=$2
+                break ;;
+
+        esac
+done
+
+# The Shiny server directory existe ?
+if [ ! -d $dirServer ]
+then
+        LOG 4 "The shiny server home  \"$dirServer\" doesn't exist"
+        echo "The shiny server home  \"$dirServer\" doesn't exist"
+        exit -2
+fi
+
+# The archive directory existe ?
+if [ ! -d $dirArchiveServer ]
+then
+        mkdir $dirArchiveServer
+        LOG 1 "Creation du fichier d'archive $dirArchiveServer"
+fi
+
+# The user home existe ?
+if [ ! -d $dirHomeUser ]
+then
+        LOG 4 "The home directory \"$dirHomeUser\" doesn't exist"
+        echo "The home directory \"$dirHomeUser\" doesn't exist"
+        exit -2
+else
+        dirAppUser="$dirHomeUser/$project_name"
+fi
+
+# The application directory existe ?
+if [ ! -d $dirAppUser ]
+then
+        LOG 4 "The application directory \"$dirAppUser\" doesn't exist"
+        echo "The application directory \"$dirAppUser\" doesn't exist"
+        exit -2
+else
+        dirAppServer="$dirServer/$project_name"
+        dirAppArchive="$dirArchiveServer/$project_name"
+fi
+
+# A application with the same name is already deploy ?
+if [ -d $dirAppServer ]
+then
+
+        # A application with the same name is already in archie
+        if [ -d $dirAppArchive ]
+        then
+                while true ; do
+                        echo ""
+                        echo "A archive of \"$project_name\" already existe, do you want remplace this archive ? (Y/N)"
+                        echo ""
+                        read answer
+                        echo ""
+                        case $answer in
+                                y|yes|Y|YES|Yes)        rm -rf $dirAppArchive
+                                                        [[ $? -ne 0 ]] && LOG 4 "Impossible de supprimer $dirAppArchive" && echo "Impossible de supprimer $dirAppArchive" && exit -4
+                                                        LOG 1 "The archive \"$dirAppArchive\" have been removed"
+                                                        break ;;
+                                n|no|N|NO|No)           echo "The project \"$project_name\" haven't deployed"
+                                                        LOG 1 "The project \"$project_name\" haven't deployed"
+                                                        exit 2 ;;
+                                *)                      echo "Answer by Yes or No (Y/N)" ;;
+                        esac
+                done
+        fi
+        #Copy the application to the archive
+        mv $dirAppServer $dirAppArchive
+        LOG 1 "The project $dirAppServer have been moved to  $dirAppArchive"
+fi
+
+#### Copy app in server directory
+cp -R $dirAppUser $dirAppServer
+LOG 1 "The project $dirAppUser have been copied to $dirAppServer"
+chmod 755 $dirAppServer
+LOG 1 "$dirAppServer : Change permission to 755"
+
+LOG 1 "The project $project_name have been deployed on $dirAppServer"
+
+echo "The project \"$project_name\" have been deployed on \"$dirAppServer\""
+echo ""
+

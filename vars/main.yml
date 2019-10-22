@@ -1,0 +1,57 @@
+---
+
+shiny_repo_name: "shiny"
+shiny_rpm: "shiny-server.x86_64"
+shiny_applis_path: "{{ applis_path }}/shiny"
+shiny_group_users: "gshiny_{{ entity_name }}"
+shiny_admin: "gshiny_admin"
+shiny_power: "gshiny_power"
+shiny_user: "shiny"
+shiny_group: "shiny"
+shiny_systemd: "/etc/systemd/system/shiny-server.service"
+shiny_sudoers: "/etc/sudoers.d/03_shiny"
+shiny_path_conf: "/etc/shiny-server"
+shiny_server_conf: "{{ shiny_path_conf }}/shiny-server.conf"
+shiny_pam_file: "/etc/pam.d/shiny"
+shiny_app_home: "{{ shiny_applis_path }}/apps"
+shiny_app_home_mode: "0755"
+shiny_default_home: "/opt/shiny-server/samples"
+shiny_log_home: "{{ shiny_applis_path }}/logs"
+
+### WEBAPP Shiny 
+shiny_webapp_group_ldap: "gshiny_app_"
+shiny_webapp_path_server: "{{ shiny_app_home }}/{{ entity_name }}" ### Where the app are deploy on the shiny server
+shiny_webapp_path_server_mode: "0755"
+shiny_webapp_archive_path_server: "{{ shiny_app_home }}/archive" ### Archive path 
+shiny_webapp_archive_server_mode: "0755"
+role_shiny_webapp_max_size: "10" ### Max size for a webapp shiny in GO
+role_webapp_fs_mode: "0750"
+
+### EXPLOITATION
+shiny_scripts: "{{ shiny_applis_path }}/scripts"
+shiny_scripts_bin: "{{ shiny_scripts }}/bin"
+shiny_scripts_cfg: "{{ shiny_scripts }}/cfg"
+shiny_scripts_log: "{{ shiny_scripts }}/log"
+watchdog_script_name: "ds_appliance_watchdog.sh"
+shiny_mail_alerte_file: "mail_alerte"
+config_watchdog_mail_alerte: "{{ shiny_scripts_cfg }}/{{ shiny_mail_alerte_file }}"
+watchdog_log_name: "{{ shiny_scripts_log }}/ds_appliance_watchdog.log"
+watchdog_script_error: "{{ shiny_scripts_log }}/ds_appliance_watchdog.err"
+
+### SUDOERS
+shiny_sudo:
+
+  - socle_sudo_comment: "SHINY"
+    socle_sudo_template_file_name: "00_sudo_template.j2"
+    socle_sudo_dest_file_name: "03_shiny"
+    socle_sudo_remove_this_config: false
+    socle_sudo_defaults: ""
+    socle_sudo_user_alias: "HAD_SHINY"
+    socle_sudo_users: "shiny"
+    socle_sudo_usernames: "user shiny"
+    socle_sudo_servers_alias: "HOSTS_HAD_SHINY"
+    socle_sudo_servers_inventory_group: "DS"
+    socle_sudo_su_users: "ALL"
+    socle_sudo_nopassword: true
+    socle_sudo_command: "/usr/bin/systemctl stop shiny-server.service,/usr/bin/systemctl start shiny-server.service,/usr/bin/systemctl restart shiny-server.service,/usr/bin/systemctl status shiny-server.service,/opt/shiny-server/bin/shiny-server *,/opt/shiny-server/bin/license-manager *"
+

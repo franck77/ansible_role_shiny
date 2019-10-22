@@ -1,0 +1,146 @@
+---
+
+- name:  Check that input variables are well transmited to config shiny
+  assert: { that: "{{ item }} is defined" }
+  with_items:
+    - shiny_server_conf
+    - shiny_user
+    - shiny_scripts
+    - shiny_systemd
+    - shiny_scripts_bin
+    - shiny_scripts_cfg
+    - shiny_scripts_log
+    - shiny_sudo
+    - shiny_mail_alerte_file
+    - config_watchdog_mail_alerte
+    - watchdog_script_name
+    - watchdog_log_name
+    - watchdog_script_error
+
+### CONF
+
+- name: "Configure shiny-server"
+  become: "true"
+  template: 
+    src: "shiny_shiny-server.conf.j2" 
+    dest: "{{ shiny_server_conf }}"
+  notify:
+    - Restart shiny-server
+
+- name: "Configure pam shiny for LDAP"
+  become: "true"
+  template: 
+    src: "templates/shiny_shiny_pam.j2" 
+    dest: "/etc/pam.d/shiny-server"
+
+- name: "Configure systemd service"
+  become: "true"
+  template:
+    src: "shiny_systemd_service.j2"
+    dest: "{{ shiny_systemd }}"
+  notify:
+    - Restart shiny-server
+
+###
+
+### SUDOERS
+
+- name: "Deploy sudo for Rstudio"
+  become: true
+  include_role:
+    name: socle_sudo
+  vars:
+    sudo_state: "install"
+
+- name: "Deploy the rules"
+  include_role:
+    name: socle_sudo
+    tasks_from: deploy_rules.yml
+  vars:
+    socle_sudo_config: "{{ shiny_sudo }}"
+
+###
+
+### EXPLOITATION
+
+- name: "Ensure scripts directory for Shiny is created"
+  become: "true"
+  file:
+        path: "{{ shiny_scripts }}"
+        state: "directory"
+        mode: "0750"
+        owner: "{{ shiny_user }}"
+        group: "{{ shiny_user }}"
+
+- name: "Ensure bin directory for Shiny is created"
+  become: "true"
+  file:
+        path: "{{ shiny_scripts_bin }}"
+        state: "directory"
+        mode: "0750"
+        owner: "{{ shiny_user }}"
+        group: "{{ shiny_user }}"
+
+- name: "Ensure cfg directory for Shiny is created"
+  become: "true"
+  file:
+        path: "{{ shiny_scripts_cfg }}"
+        state: "directory"
+        mode: "0750"
+        owner: "{{ shiny_user }}"
+        group: "{{ shiny_user }}"
+
+- name: "Ensure log directory for Shiny is created"
+  become: "true"
+  file:
+        path: "{{ shiny_scripts_log }}"
+        state: "directory"
+        mode: "0750"
+        owner: "{{ shiny_user }}"
+        group: "{{ shiny_user }}"
+
+- name: "Create exploitation script for Shiny Server"
+  become: "true"
+  template:
+        src: "shiny_script_exploitation.j2"
+        dest: "{{ shiny_scripts_bin }}/shiny.ksh"
+        owner: "{{ shiny_user }}"
+        group: "{{ shiny_user }}"
+        mode: "0750"
+
+- name: "Create deploy app script for Shiny Server"
+  become: "true"
+  template:
+        src: "shiny_deploy_app_ksh.j2"
+        dest: "{{ shiny_scripts_bin }}/deploy_webapp.ksh"
+        owner: "{{ shiny_user }}"
+        group: "{{ shiny_user }}"
+        mode: "0750"
+
+- name: "Copy watchdog script for shiny"
+  become: "true"
+  template:
+    src: "templates/ds_appliance_watchdog.sh.j2"
+    dest: "{{ shiny_scripts_bin }}/{{ watchdog_script_name }}"
+    owner: "{{ shiny_user }}"
+    group: "{{ shiny_user }}"
+    mode: "0750"
+
+- name: "Copy config mail alerte for shiny"
+  become: "true"
+  copy:
+    src: "files/{{ shiny_mail_alerte_file }}"
+    dest: "{{ config_watchdog_mail_alerte }}"
+    owner: "{{ shiny_user }}"
+    group: "{{ shiny_user }}"
+    mode: "0750"
+
+- name: "Create crontab to restart shiny if needed"
+  become: "true"
+  cron:
+    name: "Restart auto shiny"
+    user: "{{ shiny_user }}"
+    job: "{{ shiny_scripts_bin }}/{{ watchdog_script_name }} $(hostname -f) {{ shiny_port }} shiny 1>>{{ watchdog_log_name }} 2>>{{ watchdog_script_error }}"
+
+###
+

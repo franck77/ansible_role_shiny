@@ -1,0 +1,26 @@
+---
+
+- name: "Install SHINY"
+  include: "install.yml"
+  when: state in ['role_shiny_install', 'role_shiny_whole_install']
+
+- name: "Configure SHINY"
+  include: "config.yml"
+  when: state in ['role_shiny_config', 'role_shiny_whole_install']
+
+- name: "Remove SHINY"
+  include: "remove.yml"
+  when: state in ['role_shiny_remove']
+
+- name: "Update SHINY"
+  include: "update.yml"
+  when: state in ['role_shiny_update']
+
+- name: "Restart Shiny"
+  include: "restart.yml"
+  when: state in ['role_shiny_restart']
+
+- name: "Deploy Web App"
+  include: "deploy_webapp.yml"
+  when: state in ['role_shiny_deploy']
+

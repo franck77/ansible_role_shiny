@@ -1,0 +1,78 @@
+---
+
+- name:  Check that input variables are well transmited to create the filesystem
+  assert: { that: "{{ item }} is defined" }
+  with_items:
+    - shiny_user
+    - shiny_group_users    
+    - shiny_applis_path
+    - server_repo_url
+    - shiny_repo_name
+    - shiny_rpm
+    - shiny_app_home
+    - entity_name
+    - shiny_log_home
+    - shiny_webapp_path_server
+    - shiny_webapp_archive_path_server
+
+#- name: "Create unix shiny user"
+#  become: "true"
+#  user:
+#    name: "{{ shiny_user }}"
+#    shell: "/bin/bash"
+#    uid: "4003"
+#    comment: "User Shiny"
+#    home: "{{ shiny_applis_path }}"
+
+- name: "Add repository shiny"
+  become: "true"
+  yum_repository:
+    name: "shiny"
+    description: "shiny repo"
+    baseurl: "{{ server_repo_url }}/{{ shiny_repo_name }}"
+    mirrorlist: "{{ server_mirror_repo_url }}/{{ shiny_repo_name }}"
+    gpgcheck: "no"
+    enabled: "yes"
+
+- name: "Install shiny"
+  become: "true"
+  yum:
+    name: "{{ shiny_rpm }}"
+    state: "installed"
+
+- name: "Ensure entity directory is created"
+  become: "true"
+  file:
+    path: "{{ shiny_webapp_path_server }}"
+    state: "directory"
+    mode: "0775"
+    owner: "{{ shiny_user }}"
+    group: "{{ shiny_group_users }}"
+
+- name: "Ensure archive directory is created in shiny"
+  become: "true"
+  file:
+    path: "{{ shiny_webapp_archive_path_server }}"
+    state: "directory"
+    mode: "0770"
+    owner: "{{ shiny_user }}"
+    group: "{{ shiny_group_users }}"
+
+- name: "Ensure log directory is created"
+  become: "true"
+  file:
+    path: "{{ shiny_log_home }}"
+    state: "directory"
+    mode: "0770"
+    owner: "{{ shiny_user }}"
+    group: "{{ shiny_user }}"
+
+- name: "Ensure log entity directory is created"
+  become: "true"
+  file:
+    path: "{{ shiny_log_home }}/{{ entity_name }}"
+    state: "directory"
+    mode: "0770"
+    owner: "{{ shiny_user }}"
+    group: "{{ shiny_user }}"
+

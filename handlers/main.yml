@@ -1,0 +1,35 @@
+---
+
+- name: "Start shiny-server"
+  systemd:
+    name: "shiny-server"
+    state: "started"
+    enabled: "yes"
+    daemon_reload: "yes"
+
+- name: "Stop shiny-server"
+  systemd:
+    name: "shiny-server"
+    state: "stopped"
+    enabled: "yes"
+    daemon_reload: "yes"
+
+- name: "Restart shiny-server"
+  become: "true"
+  systemd:
+    name: "shiny-server"
+    state: "restarted"
+    enabled: "yes"
+    daemon_reload: "yes"
+
+- name: Enable httpd
+  systemd:
+    name: httpd
+    enabled: yes
+    masked: no
+
+- name: Restart httpd
+  systemd:
+    name: httpd
+    state: restarted
+

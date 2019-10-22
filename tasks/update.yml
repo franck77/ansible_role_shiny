@@ -1,0 +1,48 @@
+---
+
+- name: "Check that input variables are well transmitted to update SHINY"
+  assert:
+    that: "{{ item }} is defined"
+  with_items:
+    - server_repo_url
+    - shiny_repo_name
+    - server_mirror_repo_url
+    - shiny_rpm
+
+- name: "Add repository shiny"
+  become: "true"
+  yum_repository:
+    name: "shiny"
+    description: "shiny repo"
+    baseurl: "{{ server_repo_url }}/{{ shiny_repo_name }}"
+    mirrorlist: "{{ server_mirror_repo_url }}/{{ shiny_repo_name }}"
+    gpgcheck: "no"
+    enabled: "yes"
+
+- name: "Check if rstudio package is installed"
+  yum:
+    list: "shiny-server"
+  register: package_shiny
+
+- name: "Stop shiny"
+  become: "true"
+  service:
+    name: "shiny-server"
+    state: "stopped"
+  when: package_shiny.results[0].version != '{{ role_shiny_last_version }}'
+
+- name: "Install shiny"
+  become: "true"
+  yum:
+    name: "{{ shiny_rpm }}"
+    state: "latest"
+  when: package_shiny.results[0].version != '{{ role_shiny_last_version }}'
+
+- name: "Start shiny"
+  become: "true"
+  service:
+    name: "shiny-server"
+    state: "started"
+  when: package_shiny.results[0].version != '{{ role_shiny_last_version }}'
+
+

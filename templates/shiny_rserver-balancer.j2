@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+RSTUDIO_HOST=`hostname -i`
+echo "$(date +"%d/%m/%Y %H:%M:%S") - ${RSTUDIO_HOST}:{{ rstudio_port }}" >> /usr/lib/rstudio-server/log/balancing_rsession.log
+echo "${RSTUDIO_HOST}:{{ rstudio_port }}"

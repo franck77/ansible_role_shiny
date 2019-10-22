@@ -1,0 +1,236 @@
+---
+
+- name: "Check variable for deploy web app Shiny"
+  assert: { that: "{{ item }} is defined" }
+  with_items:
+    - shiny_webapp_name
+    - shiny_webapp_user
+    - shiny_webapp_group
+    - shiny_webapp_path_app_user
+    - shiny_webapp_server
+    - shiny_webapp_path_server
+    - shiny_webapp_path_server_mode
+    - shiny_webapp_archive_path_server
+    - shiny_webapp_archive_server_mode
+    - shiny_webapp_archive_format
+    - shiny_webapp_path_app_user
+    - shiny_webapp_size
+    - role_shiny_ldap_host
+    - role_shiny_path_habilitation_in
+    - role_shiny_path_habilitation_bin
+    - role_shiny_habilitation_ldap_script
+    - role_shiny_webapp_max_size
+    - role_shiny_webapp_device
+    - role_webapp_fs_mode
+    - shiny_user
+    - entity_name
+
+### Prerequisites
+
+- name: "Get WebApp Dir in {{ shiny_webapp_path_app_user }}"
+  become_user: "{{ shiny_user }}"
+  stat:
+    path: "{{ shiny_webapp_path_app_user }}"
+  register: webapp_dir_shiny
+
+- name: "Check if webapp dir {{ shiny_webapp_path_app_user }} exist"
+  fail:
+    msg: "Web application folder doesn't exist"
+  when: webapp_dir_shiny.stat.exists == false or webapp_dir_shiny.stat.isdir == false
+
+- name: "Verify destination webapp dir {{ sshiny_app_home }} exist"
+  become: "true"
+  file:
+    path: "{{ shiny_app_home }}"
+    state: "directory"
+    owner: "{{ shiny_user }}"
+    group: "gshiny_{{ entity_name }}"
+    mode: "{{ shiny_app_home_mode }}"
+
+- name: "Verify destination webapp dir {{ shiny_webapp_path_server }} exist"
+  become: "true"
+  file:
+    path: "{{ shiny_webapp_path_server }}"
+    state: "directory"
+    owner: "{{ shiny_user }}"
+    group: "gshiny_{{ entity_name }}"
+    mode: "{{ shiny_webapp_path_server_mode }}"
+
+- name: "Verify webapp archive dir {{ shiny_webapp_archive_path_server }} exist"
+  become: "true"
+  file:
+    path: "{{ shiny_webapp_archive_path_server }}"
+    state: "directory"
+    owner: "{{ shiny_user }}"
+    group: "gshiny_{{ entity_name }}"
+    mode: "{{ shiny_webapp_archive_server_mode }}"
+
+###
+
+### Archive 
+
+- name: "Get Stat WebApp Archive"
+  become_user: "{{ shiny_user }}"
+  stat:
+    path: "{{ shiny_webapp_archive_path_server }}/{{ shiny_webapp_name }}.{{ shiny_webapp_archive_format }}"
+  register: webapp_archive_shiny
+
+- name: "Copy Old Archive {{ shiny_webapp_archive_path_server }}/{{ shiny_webapp_name }}.{{ shiny_webapp_archive_format }}"
+  become: "true"
+  copy:
+    src: "{{ shiny_webapp_archive_path_server }}/{{ shiny_webapp_name }}.{{ shiny_webapp_archive_format }}"
+    dest: "{{ shiny_webapp_archive_path_server }}/{{ shiny_webapp_name }}.{{ shiny_webapp_archive_format }}.old"
+    remote_src: yes
+  when: webapp_archive_shiny.stat.exists
+
+- name: "Drop webapp archive exist"
+  become_user: "{{ shiny_user }}"
+  file:
+    path: "{{ shiny_webapp_archive_path_server }}/{{ shiny_webapp_name }}"
+    state: absent
+  when: webapp_archive_shiny.stat.exists
+
+- name: "Get Stat WebApp Server Dir"
+  become_user: "{{ shiny_user }}"
+  stat:
+    path: "{{ shiny_webapp_path_server }}/{{ shiny_webapp_name }}"
+  register: webapp_prd_srv_shiny
+
+###
+
+### Create Group for Web App
+
+- name: "Run the command to test if the group exist"
+  shell: "getent group {{ shiny_webapp_group }}"
+  register: group_exist
+  ignore_errors: yes
+  check_mode: no
+
+- name: "Check if the new group respect standards"
+  shell: "echo {{ shiny_webapp_group }} | grep \"{{ shiny_webapp_group_ldap }}\""
+  register: group_standard
+  check_mode: no
+  when: group_exist.rc == 2
+
+- name: "Get the LDAP password"
+  pause:
+    prompt: "Enter your LDAP password "
+    private: yes
+  register: my_password
+  when: group_exist.rc == 2
+
+- name: "Put LDAP password in the file"
+  delegate_to: "{{ role_shiny_ldap_host }}"
+  become: "true"
+  copy:
+    content: "{{ my_password.user_input }}"
+    dest: "{{ private_password_file }}"
+    owner: "{{ user_admin }}"
+    group: "{{ group_admin }}"
+    mode: "0400"
+  when: group_exist.rc == 2
+
+- name: "Genere habilitation file for new group"
+  delegate_to: "{{ role_shiny_ldap_host }}"
+#  become: "true"
+  become_user: "{{ user_admin }}"
+  template:
+    src: "templates/group_shiny_template.j2"
+    dest: "{{ role_shiny_path_habilitation_in }}/group_shiny_{{ shiny_webapp_group }}"
+  when: group_exist.rc == 2
+
+- name: "Set whoami vars"
+  set_fact:
+    whoami: "{{ lookup('env','USER') }}" 
+
+- name: "Run ldap script to create new groupe"
+  delegate_to: "{{ role_shiny_ldap_host }}"
+  become_user: "{{ user_admin }}"
+#  become: "true"
+  command: "{{ role_shiny_habilitation_ldap_script }} -t add --group-file group_shiny_{{ shiny_webapp_group }} --run-as {{ whoami }}"
+  when: group_exist.rc == 2
+
+- name: "Remove private ldap password"
+  delegate_to: "{{ role_shiny_ldap_host }}"
+  become: "true"
+  file:
+    path: "{{ private_password_file }}"
+    state: "absent"
+
+###
+
+### LV and FS for Web App
+
+- name: " Check Volume Group size before creating FS"
+  become: true
+  shell: "vgs --units g | grep {{ shiny_webapp_path_server }} | awk '{print $NF}' | awk -F '.' '{print $1}'" 
+  changed_when: "false"
+  register: vgs_free_size
+
+- name: " Send message when VGs size is less or equal {{ role_shiny_webapp_max_size }}G "
+  fail: 
+    msg: " The creation of the FS is not possible because we have no more than {{ role_shiny_webapp_max_size }}G available on the VGs. Please contact the platform administrator ! "
+  when: "{{ vgs_free_size <= role_shiny_webapp_max_size }}"
+
+- name: "Create FS for webapp {{shiny_webapp_name}}"
+  become: true
+  include_role: 
+    name: role_manage_fs_dev
+    tasks_from: create.yml
+  vars:
+    role_create_fs_list:
+     - { name: "{{ shiny_webapp_name }}",
+         mntp: "{{ shiny_webapp_path_server }}/{{ shiny_webapp_name }}" ,
+         fstype: "ext4",
+         size: "{{ shiny_webapp_size | default('1') }}g",
+         device: "{{ role_shiny_webapp_device }}" ,
+         owner: "{{ shiny_user }}",
+         group: "{{ shiny_webapp_group | default('{{ gshiny_{{entity_name}} }}') }}",
+         mode: '{{ role_webapp_fs_mode }}'
+       }
+  failed_when: "{{ shiny_webapp_size}} is defined and {{ shiny_webapp_size}} >= {{ role_shiny_webapp_max_size }}"  
+
+###
+
+### Archive
+
+- name: "Archive WebApp {{ shiny_webapp_name }} if exist"
+  become_user: "{{ shiny_user }}"
+  archive:
+    path: "{{ shiny_webapp_path_server }}/{{ shiny_webapp_name }}"
+    dest: "{{ shiny_webapp_archive_path_server }}/{{ shiny_webapp_name }}.{{ shiny_webapp_archive_format }}"
+    format: "{{ shiny_webapp_archive_format }}"
+  when: webapp_prd_srv_shiny.stat.exists
+
+- name: "Drop webapp if exist"
+  become_user: "{{ shiny_user }}"
+  file:
+    path: "{{ shiny_webapp_archive_path_server }}/{{ shiny_webapp_name }}"
+    state: absent
+  when: webapp_prd_srv_shiny.stat.exists
+
+###
+
+### MEP
+
+- name: "Copy Web App to server Shiny"
+  become: "true"
+  command: "cp -R {{ shiny_webapp_path_app_user }}/{{ shiny_webapp_name }} {{ shiny_webapp_path_server }}/"
+
+- name: "Modify server web app Mode and rights"
+  become: "true"
+  file:
+    path: "{{ shiny_webapp_path_server }}/{{ shiny_webapp_name }}"
+    owner: "{{ shiny_user }}"
+    group: "{{ shiny_webapp_group }}"
+    mode: "{{ role_webapp_fs_mode }}"
+    recurse: "yes"
+
+- name: "Remove old archive"
+  become: "true"
+  file:
+    path: "{{  shiny_webapp_archive_path_server }}/{{ shiny_webapp_name }}.{{ shiny_webapp_archive_format }}.old"
+    state: "absent"
+
+###
+

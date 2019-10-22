@@ -1,0 +1,25 @@
+---
+### CERTIFICAT
+certificate: '/etc/pki/tls/certs/{{inventory_hostname}}.haas.socgen.crt'
+certificate_key: '/etc/pki/tls/certs/{{inventory_hostname}}.haas.socgen.key'
+
+### PATH
+produits_path: "/produits"
+applis_path: "/applis"
+ldap_conf_file: "/etc/openldap/ldap.conf"
+keytab_directory: "/etc/security/keytabs_user"
+
+### VERSION
+role_shiny_last_version: "1.5.3.770-1"
+
+### REPO
+server_repo_url: "http://phadlx198.haas.socgen:80/repos"
+server_mirror_repo_url: "http://phadlx199.haas.socgen:80/repos"
+
+### MAIL LIST ALERT
+mail_list_watchdog: "wandrille.a.domin@socgen.com,marianne.bioy-ext@socgen.com,franck.vieira@socgen.com,philippe.trigo-ext@socgen.com,guy.akroman-ext@socgen.com"
+
+### WEB APP Shiny
+shiny_webapp_archive_format: "tar"
+shiny_webapp_path_app_user: "/data/homeDS/nfs/home/{{ shiny_webapp_user }}"
+

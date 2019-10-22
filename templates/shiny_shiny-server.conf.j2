@@ -1,0 +1,55 @@
+# Instruct Shiny Server to run applications as the user "shiny"
+run_as :AUTH_USER:;
+
+app_init_timeout 600;
+app_idle_timeout 600;
+app_session_timeout 600;
+sockjs_disconnect_delay 600;
+
+auth_pam true;
+
+{% for shiny in shiny_app %}
+
+server { 
+#############SERVER CONFIG FOR {{ shiny.name }}###############################
+  listen {{ shiny.port }};
+  ssl {{ certificate_key_shiny }} {{ certificate }};
+
+location / {
+
+    # Only up tp 20 connections per Shiny process and at most 3 Shiny processes
+    # per application. Proactively spawn a new process when our processes reach
+    # 90% capacity.
+    utilization_scheduler 20 .9 3;
+
+    # Host the directory of Shiny Apps stored in this directory
+    site_dir {{ shiny.site_dir }};
+
+    # Log all Shiny output to files in this directory
+    log_dir {{ shiny.log_dir }};
+
+    # When a user visits the base URL rather than a particular application,
+    # an index of the applications available in this directory will be shown.
+    directory_index {{ shiny.directory_index }};
+
+    location /{{entity_name}}/ {
+
+                site_dir {{ shiny.site_dir }}/{{entity_name}};
+		log_dir {{ shiny.log_dir }}/;
+                required_group gshiny_{{entity_name}} {{ shiny_admin }} {{ shiny_power }};
+
+        }
+   }
+
+}
+{% endfor %}
+
+# Provide the admin interface on port 4151
+admin 4151 {
+
+  ssl {{ certificate_key_shiny }} {{ certificate }};
+  # Restrict the admin interface to the usernames listed here. Currently
+  # just one user named "admin"
+  required_group {{ shiny_admin }} {{ shiny_power }};
+}
+

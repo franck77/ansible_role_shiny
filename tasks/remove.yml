@@ -1,0 +1,74 @@
+---
+
+- name:  "Check that input variables are well transmited"
+  assert: { that: "{{ item }} is defined" }
+  with_items:
+      - shiny_repo_name
+      - shiny_rpm
+      - shiny_path_conf
+      - shiny_app_home
+      - shiny_user
+
+- name: "Stop shiny"
+  become: "true"
+  service:
+        name: "shiny-server"
+        state: "stopped"
+
+- name: "Remove shiny"
+  become: "true"
+  yum:
+    name: "{{ shiny_rpm }}"
+    state: "absent"
+
+- name: "Remove sudoers file"
+  become: "true"
+  file:
+    path: "{{ shiny_sudoers }}"
+    state: "absent"
+
+- name: "Remove systemd file"
+  become: "true"
+  file:
+    path: "{{ shiny_systemd }}"
+    state: "absent"
+
+- name: "Remove yum repos"
+  become: "true"
+  file:
+    path: "{{ shiny_repo_name }}"
+    state: "absent"
+
+- name: "Remove configurations files"
+  become: "true"
+  file:
+    path: "{{ shiny_path_conf }}"
+    state: "absent"
+
+- name: "Remove application server directory"
+  become: "true"
+  file:
+    path: "{{ shiny_app_home }}"
+    state: "absent"
+
+#- name: "Remove FS & LV"
+#  include_role:
+#    name: "role_manage_fs"
+#  become: "true"
+#  tags: "delete"
+#  vars:
+#    state: "delete"
+
+#- name: "Remove application directory"
+#  file:
+#    path: "{{ shiny_applis_path }}"
+#    state: "absent"
+
+#- name: "Remove shiny user"
+#  become: yes
+#  user:
+#    name: "{{ shiny_user }}"
+#    state: "absent"
+#    remove: "yes"
+
+
