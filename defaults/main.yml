@@ -1,8 +1,4 @@
 ---
-### CERTIFICAT
-certificate: '/etc/pki/tls/certs/{{inventory_hostname}}.haas.socgen.crt'
-certificate_key: '/etc/pki/tls/certs/{{inventory_hostname}}.haas.socgen.key'
-
 ### PATH
 produits_path: "/produits"
 applis_path: "/applis"
